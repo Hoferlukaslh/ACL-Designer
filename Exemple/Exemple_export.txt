@@ -1,0 +1,80 @@
+! ==========================================
+! Configuration de l'ACL: ACL_USERS
+! ==========================================
+ip access-list extended ACL_USERS
+ ! Acces aux serveurs web internes
+ permit tcp 192.168.20.0 0.0.0.255 192.168.10.0 0.0.0.255 eq 80
+ permit tcp 192.168.20.0 0.0.0.255 192.168.10.0 0.0.0.255 eq 443
+ ! Acces a un serveur de fichier specifique
+ permit tcp 192.168.20.0 0.0.0.255 host 192.168.10.50 eq 445
+ ! Autoriser le ping vers tout le reseau
+ permit icmp 192.168.20.0 0.0.0.255 any
+ ! Interdire l'acces aux equipements IoT
+ deny ip 192.168.20.0 0.0.0.255 192.168.40.0 0.0.0.255
+ ! Autoriser tout le reste vers Internet
+ permit ip 192.168.20.0 0.0.0.255 any
+ exit
+!
+interface Vlan 20
+ ip access-group ACL_USERS in
+!
+
+! ==========================================
+! Configuration de l'ACL: ACL_GUESTS
+! ==========================================
+ip access-list extended ACL_GUESTS
+ ! Autoriser le DNS vers l'exterieur
+ permit udp 192.168.30.0 0.0.0.255 host 8.8.8.8 eq 53
+ ! Bloquer l'acces aux Serveurs
+ deny ip 192.168.30.0 0.0.0.255 192.168.10.0 0.0.0.255
+ ! Bloquer l'acces aux Employes
+ deny ip 192.168.30.0 0.0.0.255 192.168.20.0 0.0.0.255
+ ! Bloquer l'acces a l'IoT
+ deny ip 192.168.30.0 0.0.0.255 192.168.40.0 0.0.0.255
+ ! Bloquer l'acces a la DMZ
+ deny ip 192.168.30.0 0.0.0.255 192.168.99.0 0.0.0.255
+ ! Autoriser le trafic web vers Internet
+ permit tcp 192.168.30.0 0.0.0.255 any eq 80
+ permit tcp 192.168.30.0 0.0.0.255 any eq 443
+ exit
+!
+interface Vlan 30
+ ip access-group ACL_GUESTS in
+!
+
+! ==========================================
+! Configuration de l'ACL: ACL_IOT
+! ==========================================
+ip access-list extended ACL_IOT
+ ! Autoriser le MQTT vers le serveur IoT externe
+ permit tcp 192.168.40.0 0.0.0.255 host 198.51.100.1 eq 1883
+ ! Bloquer tout trafic vers l'interne
+ deny ip 192.168.40.0 0.0.0.255 192.168.10.0 0.0.0.255
+ deny ip 192.168.40.0 0.0.0.255 192.168.20.0 0.0.0.255
+ deny ip 192.168.40.0 0.0.0.255 192.168.30.0 0.0.0.255
+ deny ip 192.168.40.0 0.0.0.255 192.168.99.0 0.0.0.255
+ ! Bloquer le reste vers Internet
+ deny ip 192.168.40.0 0.0.0.255 any
+ exit
+!
+interface Vlan 40
+ ip access-group ACL_IOT in
+!
+
+! ==========================================
+! Configuration de l'ACL: ACL_DMZ
+! ==========================================
+ip access-list extended ACL_DMZ
+ ! Autoriser les reponses de la DMZ vers l'exterieur
+ permit tcp 192.168.99.0 0.0.0.255 any eq 80
+ permit tcp 192.168.99.0 0.0.0.255 any eq 443
+ ! Bloquer l'initiation de connexions vers l'interne
+ deny ip 192.168.99.0 0.0.0.255 192.168.10.0 0.0.0.255
+ deny ip 192.168.99.0 0.0.0.255 192.168.20.0 0.0.0.255
+ permit ip 192.168.99.0 0.0.0.255 any
+ exit
+!
+interface Vlan 99
+ ip access-group ACL_DMZ in
+!
+
