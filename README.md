@@ -60,3 +60,10 @@ exit
 interface Vlan10
  ip access-group ACL_SERVEURS in
 ```
+
+## Note sur l'IA
+Ce projet a été intégralement réalisé selon la méthode du "Vibecoding" : une collaboration étroite et itérative entre l'intelligence humaine et l'intelligence artificielle.
+
+En utilisant ACL Designer, vous acceptez le fait que vous êtes aux commandes d'un outil expérimental. Amusez-vous, gagnez du temps, mais restez vigilants !
+
+> IA utilisé : `Gemini 3.1 Pro`, `Claude Code Opus 4.7` et `Qwen 3.6 35B Q4_K_M`.
