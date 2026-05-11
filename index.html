@@ -597,7 +597,7 @@
                     let candidateId = octets[2];
                     if(!newNetworks.find(n => n.id === candidateId)) {
                         id = candidateId;
-                        name = "VLAN " + id;
+                        name = "VLAN" + id;
                     }
                 }
 
@@ -710,7 +710,7 @@
                         if(!newNetworks.find(n => n.id === currentInterface)) {
                             newNetworks.push({
                                 id: currentInterface,
-                                name: "VLAN " + currentInterface,
+                                name: "VLAN" + currentInterface,
                                 ip: "0.0.0.0",
                                 wildcard: "0.0.0.255"
                             });
@@ -1152,7 +1152,7 @@
             networks.forEach(n => {
                 const opt = document.createElement('option');
                 opt.value = n.id;
-                opt.textContent = n.id === "any" ? n.name : `VLAN ${n.id} - ${n.name}`;
+                opt.textContent = n.id === "any" ? n.name : `VLAN${n.id} - ${n.name}`;
                 selects[0].appendChild(opt.cloneNode(true));
                 selects[1].appendChild(opt.cloneNode(true));
             });
@@ -1265,7 +1265,7 @@
 
                 if (acl.targets.length > 0) {
                     acl.targets.forEach(t => {
-                        const prefix = isNaN(t.id) ? "" : "Vlan ";
+                        const prefix = isNaN(t.id) ? "" : "Vlan";
                         code += `<span class="keyword-text">interface ${prefix}${t.id}</span>\n ip access-group ${acl.name} ${t.dir}\n<span class="comment-text">!</span>\n`;
                     });
                 } else {
@@ -1356,7 +1356,7 @@
             
             networks.forEach(n => {
                 let idNode = n.id === "any" ? "any_node" : "vlan_" + n.id;
-                let label = n.id === "any" ? "Internet (Any)" : `VLAN ${n.id}<br/>${n.name}`;
+                let label = n.id === "any" ? "Internet (Any)" : `VLAN${n.id}<br/>${n.name}`;
                 graph += `    ${idNode}["${label}"]\n`;
             });
 
