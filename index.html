@@ -2,7 +2,17 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="./Images/icone/favicon-96x96.png" sizes="96x96" />
+    <link rel="icon" type="image/svg+xml" href="./Images/icone/favicon.svg" />
+    <link rel="shortcut icon" href="./Images/icone/favicon.ico" />
+    <link rel="apple-touch-icon" sizes="180x180" href="./Images/icone/apple-touch-icon.png" />
+    <meta name="apple-mobile-web-app-title" content="ACL D." />
+    <link rel="manifest" href="./Images/icone/site.webmanifest" />
+
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
     <title>ACL Designer - Multi-ACL & Topologie</title>
     
     <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
@@ -87,6 +97,7 @@
             transition: opacity 0.2s;
             font-size: 0.9rem;
         }
+        button:disabled { opacity: 0.4; cursor: not-allowed; filter: grayscale(100%); }
 
         button:hover { opacity: 0.8; }
         button.danger { background-color: var(--danger); }
@@ -234,7 +245,7 @@
             gap: 10px;
         }
 
-        /* --- NOUVEAU: Styles pour la modale d'importation IOS --- */
+        /* Styles pour la modale d'importation IOS  */
         .modal-overlay {
             display: none;
             position: fixed;
@@ -279,6 +290,7 @@
             <p>Gestionnaire de réseaux et de listes de contrôle d'accès multiples avec topologie en temps réel</p>
         </div>
         <div class="header-actions">
+            <button class="danger" onclick="clearProject()" style="background-color: #c0392b;">🗑️ Tout effacer</button>
             <button class="danger" onclick="openIosImport()">⚠️ Importer IOS</button>
             <button class="dark" onclick="exportJson()">💾 Sauvegarder (.json)</button>
             <button class="dark" onclick="document.getElementById('import-file').click()">📂 Charger JSON</button>
@@ -437,8 +449,8 @@
 
             <div id="mermaid-output-wrapper">
                 <div class="diagram-controls">
-                    <button class="accent" onclick="downloadMermaidPng()">⬇️ Télécharger PNG</button>
-                    <button id="btn-fullscreen" class="dark" onclick="toggleFullscreen()">🔲 Plein Écran</button>
+                    <button class="accent" onclick="downloadMermaidPng()">⬇️ PNG</button>
+                    <button id="btn-fullscreen" class="dark" onclick="toggleFullscreen()">Plein Écran</button>
                 </div>
                 <div id="mermaid-output"></div>
             </div>
@@ -520,7 +532,7 @@
             });
         }
 
-        // --- NOUVEAU : FONCTIONS D'IMPORTATION IOS (PARSING) ---
+        // FONCTIONS D'IMPORTATION IOS (PARSING)
         function openIosImport() {
             // Avertissement initial
             if(!confirm("⚠️ ATTENTION ACTION DESTRUCTRICE ⚠️\n\nL'importation d'une configuration IOS va écraser TOUT votre projet actuel (Réseaux, ACLs, Règles).\nVoulez-vous vraiment continuer ?")) return;
@@ -780,6 +792,35 @@
                     rangeSeparator.style.display = 'none';
                 }
             }
+        }
+
+        function clearProject() {
+            // 1. Demande de confirmation stricte
+            if(!confirm("⚠️ ATTENTION : ACTION IRRÉVERSIBLE ⚠️\n\nVoulez-vous vraiment TOUT effacer ?\nCela supprimera tous vos réseaux (VLANs), vos ACLs, et toutes vos règles.")) {
+                return;
+            }
+
+            document.getElementById('import-file').value = "";
+
+            // 2. Réinitialisation des données au strict minimum (Internet 'any' uniquement)
+            networks = [
+                { id: "any", name: "Any (Internet)", ip: "any", wildcard: "" }
+            ];
+            acls = [];
+            activeAclId = null;
+
+            // 3. Annulation de toute édition en cours pour éviter les bugs d'interface
+            editingVlanId = null;
+            editingRuleIndex = null;
+            resetVlanForm();
+            if (document.getElementById('rule-form-container').classList.contains('editing-mode')) {
+                cancelRuleEdit();
+            }
+
+            // 4. Nettoyage de l'interface et sauvegarde dans le cache du navigateur
+            updateUI();
+            updatePortState();
+            saveToBrowser();
         }
 
         function saveToBrowser() {

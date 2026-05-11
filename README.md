@@ -6,7 +6,7 @@
 
 Fini les erreurs de syntaxe et les plans réseau brouillons : dessinez vos règles, l'outil génère le code Cisco et cartographie votre topologie en temps réel !
 
-![Aperçu du site](./Image/Site.png)
+![Aperçu du site](./Images/Site.png)
 
 ---
 

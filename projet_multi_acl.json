@@ -1,0 +1,139 @@
+{
+  "networks": [
+    {
+      "id": "any",
+      "name": "Any (Internet)",
+      "ip": "any",
+      "wildcard": ""
+    },
+    {
+      "id": "10",
+      "name": "Routeurs",
+      "ip": "192.168.10.0",
+      "wildcard": "0.0.0.255"
+    },
+    {
+      "id": "15",
+      "name": "Serveurs",
+      "ip": "192.168.15.0",
+      "wildcard": "0.0.0.255"
+    },
+    {
+      "id": "20",
+      "name": "Management",
+      "ip": "192.168.20.0",
+      "wildcard": "0.0.0.255"
+    },
+    {
+      "id": "30",
+      "name": "DMZ",
+      "ip": "192.168.30.0",
+      "wildcard": "0.0.0.255"
+    },
+    {
+      "id": "40",
+      "name": "IoT",
+      "ip": "192.168.40.0",
+      "wildcard": "0.0.0.255"
+    },
+    {
+      "id": "50",
+      "name": "VoIP",
+      "ip": "192.168.50.0",
+      "wildcard": "0.0.0.255"
+    },
+    {
+      "id": "60",
+      "name": "Imprimantes",
+      "ip": "192.168.60.0",
+      "wildcard": "0.0.0.255"
+    },
+    {
+      "id": "70",
+      "name": "VenteDirection",
+      "ip": "192.168.70.0",
+      "wildcard": "0.0.0.255"
+    },
+    {
+      "id": "80",
+      "name": "BureauEtude",
+      "ip": "192.168.80.0",
+      "wildcard": "0.0.0.255"
+    },
+    {
+      "id": "90",
+      "name": "Invite",
+      "ip": "192.168.90.0",
+      "wildcard": "0.0.0.255"
+    },
+    {
+      "id": "100",
+      "name": "Atelier",
+      "ip": "192.168.100.0",
+      "wildcard": "0.0.0.255"
+    },
+    {
+      "id": "110",
+      "name": "MachinesTests",
+      "ip": "192.168.110.0",
+      "wildcard": "0.0.0.255"
+    },
+    {
+      "id": "120",
+      "name": "Exposition",
+      "ip": "192.168.120.0",
+      "wildcard": "0.0.0.255"
+    },
+    {
+      "id": "130",
+      "name": "Installateurs",
+      "ip": "192.168.130.0",
+      "wildcard": "0.0.0.255"
+    }
+  ],
+  "acls": [
+    {
+      "id": "acl_1778518591648",
+      "name": "ACL_INVITE_PAS_ACCES_A_SERVEURS",
+      "targets": [
+        {
+          "id": "90",
+          "dir": "out"
+        }
+      ],
+      "rules": [
+        {
+          "comment": "Autoriser DNS",
+          "action": "permit",
+          "proto": "udp",
+          "srcId": "90",
+          "dstId": "any",
+          "operator": "eq",
+          "portStart": "53",
+          "portEnd": ""
+        },
+        {
+          "comment": "Acces a internet",
+          "action": "permit",
+          "proto": "ip",
+          "srcId": "90",
+          "dstId": "any",
+          "operator": "eq",
+          "portStart": "",
+          "portEnd": ""
+        },
+        {
+          "comment": "Blocker acces serveurs",
+          "action": "deny",
+          "proto": "ip",
+          "srcId": "90",
+          "dstId": "15",
+          "operator": "eq",
+          "portStart": "",
+          "portEnd": ""
+        }
+      ]
+    }
+  ],
+  "activeAclId": "acl_1778518591648"
+}
