@@ -1,7 +1,7 @@
 // ==========================================
 // 1. INITIALISATION ET VARIABLES GLOBALES
 // ==========================================
-mermaid.initialize({ startOnLoad: false, theme: 'default', securityLevel: 'loose' });
+mermaid.initialize({ startOnLoad: false, theme: 'default', securityLevel: 'strict' });
 
 let networks = [
     { id: "any", name: "Any (Internet)", ip: "any", wildcard: "" },
@@ -39,7 +39,28 @@ window.addEventListener('resize', () => {
 });
 
 // ==========================================
-// 2. LOGIQUE DE MASQUE & MIGRATION V3
+// 2. UTILITAIRES DE SÉCURITÉ
+// ==========================================
+
+// Échappe les caractères HTML pour prévenir les injections XSS dans innerHTML
+function escapeHtml(s) {
+    if (s == null) return '';
+    return String(s)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+
+// Échappe les guillemets et sauts de ligne dans les labels Mermaid
+// pour éviter de casser la syntaxe du graphe
+function escapeMermaidLabel(s) {
+    return String(s || '').replace(/"/g, '#quot;').replace(/\n/g, ' ');
+}
+
+// ==========================================
+// 3. LOGIQUE DE MASQUE & MIGRATION V3
 // ==========================================
 function validateWildcard(ip, wildcard) {
     if(ip === "any" || ip === "0.0.0.0") return true;
@@ -83,21 +104,34 @@ function saveToBrowser() {
 }
 
 function loadFromBrowser() {
-    const savedV3 = localStorage.getItem('acl_designer_multi_acl_v3');
-    const savedV2 = localStorage.getItem('acl_designer_multi_acl_v2');
-    const saved = savedV3 || savedV2;
-
-    if (saved) {
+    try {
+        const saved = localStorage.getItem('acl_designer_multi_acl_v3') 
+                   || localStorage.getItem('acl_designer_multi_acl_v2');
+        if (!saved) return;
         const data = JSON.parse(saved);
-        networks = data.networks || networks;
-        interfaces = data.interfaces || interfaces; 
-        acls = data.acls || acls;
+        // Valider que les champs attendus sont bien des tableaux
+        if (Array.isArray(data.networks)) networks = data.networks;
+        if (Array.isArray(data.interfaces)) interfaces = data.interfaces;
+        if (Array.isArray(data.acls)) acls = data.acls;
         activeAclId = data.activeAclId || (acls.length > 0 ? acls[0].id : null);
+    } catch (e) {
+        console.error("Données locales corrompues, réinitialisation.", e);
+        localStorage.removeItem('acl_designer_multi_acl_v3');
     }
 }
 
+function validateIpFormat(ip) {
+    return /^(\d{1,3}\.){3}\d{1,3}$/.test(ip) &&
+        ip.split('.').every(o => { const n = parseInt(o); return n >= 0 && n <= 255; });
+}
+
+function validatePort(val) {
+    const n = parseInt(val, 10);
+    return !isNaN(n) && n >= 0 && n <= 65535 && String(n) === val.trim();
+}
+
 // ==========================================
-// 3. PARSEUR IOS (INGÉNIERIE INVERSE)
+// 4. PARSEUR IOS (INGÉNIERIE INVERSE)
 // ==========================================
 function openIosImport() {
     if(!confirm("⚠️ L'importation écrasera le projet actuel.\nContinuer ?")) return;
@@ -228,7 +262,7 @@ function processIosImport() {
 }
 
 // ==========================================
-// 4. ETATS UI & GESTION DES CHAMPS DYNAMIQUES
+// 5. ETATS UI & GESTION DES CHAMPS DYNAMIQUES
 // ==========================================
 function clearProject() {
     if(!confirm("⚠️ ATTENTION : ACTION IRRÉVERSIBLE ⚠️\n\nVoulez-vous vraiment TOUT effacer ?")) return;
@@ -291,7 +325,7 @@ function updatePortState() {
 }
 
 // ==========================================
-// 5. GESTION DES RÉSEAUX ET VALIDATION WILDCARD
+// 6. GESTION DES RÉSEAUX ET VALIDATION WILDCARD
 // ==========================================
 function saveVlan() {
     const id = document.getElementById('vlan-id').value.trim();
@@ -299,7 +333,10 @@ function saveVlan() {
     const ip = document.getElementById('vlan-ip').value.trim();
     const wild = document.getElementById('vlan-wild').value.trim();
 
+    // Validation IP/Wildcard
     if(!id || !name || !ip) return alert("Champs incomplets");
+    if (ip !== 'any' && !validateIpFormat(ip)) return alert("Format IP invalide.");
+    if (wild && !validateIpFormat(wild)) return alert("Format wildcard invalide.");
 
     if(!validateWildcard(ip, wild)) {
         if(!confirm(`⚠️ L'adresse réseau ${ip} et le masque ${wild} semblent mathématiquement incohérents (bits d'hôtes non nuls dans la définition réseau). Voulez-vous vraiment forcer cette sauvegarde ?`)) {
@@ -352,19 +389,30 @@ function renderVlanList() {
     networks.forEach(n => {
         if(n.id === "any") return;
         const div = document.createElement('div'); div.className = "list-item";
-        div.innerHTML = `
-            <span><strong>${n.id}</strong>: ${n.name} (${n.ip})</span>
-            <div class="item-actions">
-                <button class="dark" onclick="editVlan('${n.id}')" style="padding:2px 8px; font-size:0.7rem;">Éditer</button>
-                <button class="danger" onclick="deleteVlan('${n.id}')" style="padding:2px 8px; font-size:0.7rem;">X</button>
-            </div>
-        `;
+
+        const infoSpan = document.createElement('span');
+        infoSpan.innerHTML = `<strong>${escapeHtml(n.id)}</strong>: ${escapeHtml(n.name)} (${escapeHtml(n.ip)})`;
+
+        const actionsDiv = document.createElement('div'); actionsDiv.className = "item-actions";
+
+        const btnEdit = document.createElement('button');
+        btnEdit.className = "dark"; btnEdit.style.cssText = "padding:2px 8px; font-size:0.7rem;";
+        btnEdit.textContent = "Éditer";
+        btnEdit.addEventListener('click', () => editVlan(n.id));
+
+        const btnDel = document.createElement('button');
+        btnDel.className = "danger"; btnDel.style.cssText = "padding:2px 8px; font-size:0.7rem;";
+        btnDel.textContent = "X";
+        btnDel.addEventListener('click', () => deleteVlan(n.id));
+
+        actionsDiv.appendChild(btnEdit); actionsDiv.appendChild(btnDel);
+        div.appendChild(infoSpan); div.appendChild(actionsDiv);
         container.appendChild(div);
     });
 }
 
 // ==========================================
-// 5.5 GESTION DES INTERFACES (CIBLES)
+// 6.5 GESTION DES INTERFACES (CIBLES)
 // ==========================================
 function saveInterface() {
     const name = document.getElementById('int-name').value.trim(); const desc = document.getElementById('int-desc').value.trim();
@@ -406,21 +454,32 @@ function deleteInterface(id) {
 function renderInterfaceList() {
     const container = document.getElementById('interface-list-container'); container.innerHTML = "";
     interfaces.forEach(i => {
-        const descStr = i.description ? `<span style="color:#777; font-size:0.8em;"> - ${i.description}</span>` : '';
         const div = document.createElement('div'); div.className = "list-item";
-        div.innerHTML = `
-            <span><strong>${i.name}</strong>${descStr}</span>
-            <div class="item-actions">
-                <button class="dark" onclick="editInterface('${i.id}')" style="padding:2px 8px; font-size:0.7rem;">Éditer</button>
-                <button class="danger" onclick="deleteInterface('${i.id}')" style="padding:2px 8px; font-size:0.7rem;">X</button>
-            </div>
-        `;
+
+        const infoSpan = document.createElement('span');
+        infoSpan.innerHTML = `<strong>${escapeHtml(i.name)}</strong>`
+            + (i.description ? `<span style="color:#777; font-size:0.8em;"> - ${escapeHtml(i.description)}</span>` : '');
+
+        const actionsDiv = document.createElement('div'); actionsDiv.className = "item-actions";
+
+        const btnEdit = document.createElement('button');
+        btnEdit.className = "dark"; btnEdit.style.cssText = "padding:2px 8px; font-size:0.7rem;";
+        btnEdit.textContent = "Éditer";
+        btnEdit.addEventListener('click', () => editInterface(i.id));
+
+        const btnDel = document.createElement('button');
+        btnDel.className = "danger"; btnDel.style.cssText = "padding:2px 8px; font-size:0.7rem;";
+        btnDel.textContent = "X";
+        btnDel.addEventListener('click', () => deleteInterface(i.id));
+
+        actionsDiv.appendChild(btnEdit); actionsDiv.appendChild(btnDel);
+        div.appendChild(infoSpan); div.appendChild(actionsDiv);
         container.appendChild(div);
     });
 }
 
 // ==========================================
-// 6. GESTION DES ACLS ET RÈGLES
+// 7. GESTION DES ACLS ET RÈGLES
 // ==========================================
 function getActiveAcl() { return acls.find(a => a.id === activeAclId); }
 
@@ -443,7 +502,12 @@ function changeActiveAcl() { activeAclId = document.getElementById('acl-selector
 function updateAclName() { 
     const activeAcl = getActiveAcl(); 
     if(activeAcl) { 
-        activeAcl.name = document.getElementById('acl-custom-name').value.trim().toUpperCase().replace(/\s+/g, '_'); 
+        activeAcl.name = document.getElementById('acl-custom-name').value
+            .trim()
+            .toUpperCase()
+            .replace(/[^A-Z0-9_\-\.]/g, '_') // Caractères IOS valides uniquement
+            .substring(0, 64); // Limite IOS : 64 caractères
+
         generateOutput(); 
         document.querySelector(`#acl-selector option[value="${activeAcl.id}"]`).textContent = activeAcl.name; 
         saveToBrowser(); 
@@ -505,16 +569,29 @@ function renderTargetCheckboxes(activeAcl) {
         const currentDir = targetData ? targetData.dir : 'in';
 
         const div = document.createElement('div'); div.className = "vlan-checkbox-group";
-        div.innerHTML = `
-            <label class="vlan-checkbox" title="${i.description || i.name}">
-                <input type="checkbox" ${isChecked ? "checked" : ""} onchange="toggleTarget('${i.id}')">
-                ${i.name}
-            </label>
-            <select class="dir-select" onchange="updateTargetDirection('${i.id}', this.value)" ${!isChecked ? "disabled" : ""}>
-                <option value="in" ${currentDir === 'in' ? "selected" : ""}>IN</option>
-                <option value="out" ${currentDir === 'out' ? "selected" : ""}>OUT</option>
-            </select>
-        `;
+
+        // Label + checkbox
+        const label = document.createElement('label');
+        label.className = "vlan-checkbox";
+        label.title = i.description || i.name;
+
+        const checkbox = document.createElement('input');
+        checkbox.type = "checkbox";
+        checkbox.checked = isChecked;
+        checkbox.addEventListener('change', () => toggleTarget(i.id));
+
+        const labelText = document.createTextNode(i.name);
+        label.appendChild(checkbox); label.appendChild(labelText);
+
+        // Select direction
+        const select = document.createElement('select');
+        select.className = "dir-select";
+        select.disabled = !isChecked;
+        select.innerHTML = `<option value="in" ${currentDir === 'in' ? "selected" : ""}>IN</option>
+                            <option value="out" ${currentDir === 'out' ? "selected" : ""}>OUT</option>`;
+        select.addEventListener('change', () => updateTargetDirection(i.id, select.value));
+
+        div.appendChild(label); div.appendChild(select);
         container.appendChild(div);
     });
 }
@@ -534,28 +611,49 @@ function renderDropdowns() {
 
 function saveRule() {
     const activeAcl = getActiveAcl(); if(!activeAcl) return;
+
+    const proto        = document.getElementById('rule-proto').value;
+    const portStartVal = document.getElementById('rule-port-start').value.trim();
+    const portEndVal   = document.getElementById('rule-port-end').value.trim();
+
+    // Validation des ports TCP/UDP
+    if (['tcp', 'udp'].includes(proto) && portStartVal) {
+        if (!validatePort(portStartVal))
+            return alert("Port invalide. Entrez un entier entre 0 et 65535.");
+        if (document.getElementById('rule-operator').value === 'range' && portEndVal) {
+            if (!validatePort(portEndVal))
+                return alert("Port de fin invalide. Entrez un entier entre 0 et 65535.");
+            if (parseInt(portEndVal) <= parseInt(portStartVal))
+                return alert("Le port de fin doit être strictement supérieur au port de début.");
+        }
+    }
+
     let seqVal = document.getElementById('rule-seq').value;
     let seq = seqVal ? parseInt(seqVal) : (activeAcl.rules.length > 0 ? Math.max(...activeAcl.rules.map(r => r.seq)) + 10 : 10);
-    
+
     const rule = {
-        seq: seq, 
-        comment: document.getElementById('rule-comment').value.trim(), 
-        action: document.getElementById('rule-action').value,
-        proto: document.getElementById('rule-proto').value, 
-        srcId: document.getElementById('rule-src').value, 
-        dstId: document.getElementById('rule-dst').value,
-        operator: document.getElementById('rule-proto').value === 'icmp' ? "" : document.getElementById('rule-operator').value,
-        portStart: document.getElementById('rule-port-start').value.trim(), 
-        portEnd: document.getElementById('rule-port-end').value.trim(),
-        established: document.getElementById('rule-established').checked, 
-        fragments: document.getElementById('rule-fragments').checked,
-        log: document.getElementById('rule-log').checked, 
-        logInput: document.getElementById('rule-log-input').checked
+        seq:      seq,
+        comment:  document.getElementById('rule-comment').value.trim(),
+        action:   document.getElementById('rule-action').value,
+        proto:    proto,
+        srcId:    document.getElementById('rule-src').value,
+        dstId:    document.getElementById('rule-dst').value,
+        operator: proto === 'icmp' ? "" : document.getElementById('rule-operator').value,
+        portStart: portStartVal,
+        portEnd:   portEndVal,
+        established: document.getElementById('rule-established').checked,
+        fragments:   document.getElementById('rule-fragments').checked,
+        log:         document.getElementById('rule-log').checked,
+        logInput:    document.getElementById('rule-log-input').checked
     };
 
-    if (editingRuleIndex !== null) { activeAcl.rules[editingRuleIndex] = rule; editingRuleIndex = null; } 
+    const seqExists = editingRuleIndex === null &&
+                      activeAcl.rules.some(r => r.seq === seq);
+    if (seqExists) return alert(`Le numéro de séquence ${seq} est déjà utilisé.`);
+
+    if (editingRuleIndex !== null) { activeAcl.rules[editingRuleIndex] = rule; editingRuleIndex = null; }
     else { activeAcl.rules.push(rule); }
-    
+
     activeAcl.rules.sort((a, b) => a.seq - b.seq);
     cancelRuleEdit(); updateUI(); saveToBrowser();
 }
@@ -602,7 +700,7 @@ function cancelRuleEdit() {
 function removeRule(index) { const activeAcl = getActiveAcl(); if(activeAcl) { activeAcl.rules.splice(index, 1); updateUI(); saveToBrowser(); } }
 
 // ==========================================
-// 7. GÉNÉRATION DE CODE IOS & RENDER TABLE
+// 8. GÉNÉRATION DE CODE IOS & RENDER TABLE
 // ==========================================
 function updateUI() {
     renderVlanList(); renderInterfaceList(); renderAclManager(); renderDropdowns(); renderTable(); generateOutput(); renderMermaidDiagram();
@@ -610,10 +708,10 @@ function updateUI() {
 
 function getPortDisplayString(r) {
     if (['ip', 'ospf', 'eigrp', 'esp'].includes(r.proto)) return "-";
-    if (r.proto === 'icmp') return r.portStart || "-";
+    if (r.proto === 'icmp') return escapeHtml(r.portStart) || "-";
     if (!r.portStart) return "-";
-    if (r.operator === 'range' && r.portEnd) return `range ${r.portStart}-${r.portEnd}`;
-    return `${r.operator} ${r.portStart}`;
+    if (r.operator === 'range' && r.portEnd) return `range ${escapeHtml(r.portStart)}-${escapeHtml(r.portEnd)}`;
+    return `${escapeHtml(r.operator)} ${escapeHtml(r.portStart)}`;
 }
 
 function formatIPRule(net) {
@@ -664,6 +762,7 @@ function checkAclWarnings(activeAcl) {
             let portCovered = isPortCovering(r1, r2);
 
             if (protoCovered && srcCovered && dstCovered && portCovered) {
+                // r2.seq et r1.seq sont des entiers (parseInt), pas de risque XSS
                 warnings.push({
                     type: 'warning',
                     msg: `⚠️ <strong>Ombrage (Rule Shadowing) :</strong> La séquence <strong>${r2.seq}</strong> ne sera jamais évaluée par le routeur car elle est totalement couverte par la séquence plus large <strong>${r1.seq}</strong>.`
@@ -710,9 +809,13 @@ function renderTable() {
 
     // Affichage des règles
     activeAcl.rules.forEach((r, i) => {
-        const src = networks.find(n => n.id === r.srcId)?.name || "Inconnu";
-        const dst = networks.find(n => n.id === r.dstId)?.name || "Inconnu";
-        const comment = r.comment ? `<br><span style="color:#6a9955; font-size:0.8em;">! ${r.comment}</span>` : "";
+        // Noms issus des données : échappement obligatoire
+        const src = escapeHtml(networks.find(n => n.id === r.srcId)?.name || "Inconnu");
+        const dst = escapeHtml(networks.find(n => n.id === r.dstId)?.name || "Inconnu");
+        // Commentaire libre saisi par l'utilisateur : échappement obligatoire
+        const comment = r.comment
+            ? `<br><span style="color:#6a9955; font-size:0.8em;">! ${escapeHtml(r.comment)}</span>`
+            : "";
         let flags = [];
         if(r.established) flags.push('<span class="badge badge-est">ESTABLISHED</span>');
         if(r.fragments) flags.push('<span class="badge badge-frag">FRAGMENTS</span>');
@@ -720,10 +823,11 @@ function renderTable() {
         else if(r.log) flags.push('<span class="badge badge-log">LOG</span>');
         const flagStr = flags.length > 0 ? `<br>${flags.join(" ")}` : "";
 
+        // r.seq est un parseInt → sûr ; i est l'index du forEach → sûr
         body.innerHTML += `<tr>
             <td><strong>${r.seq}</strong></td>
-            <td style="color:${r.action === 'permit' ? 'green' : 'red'}"><strong>${r.action.toUpperCase()}</strong></td>
-            <td>${r.proto.toUpperCase()}</td><td>${src}</td><td>${dst}</td>
+            <td style="color:${r.action === 'permit' ? 'green' : 'red'}"><strong>${escapeHtml(r.action.toUpperCase())}</strong></td>
+            <td>${escapeHtml(r.proto.toUpperCase())}</td><td>${src}</td><td>${dst}</td>
             <td>${getPortDisplayString(r)}${flagStr}${comment}</td> 
             <td>
                 <button class="dark" onclick="editRule(${i})" style="padding:2px 8px;">Éditer</button> 
@@ -740,22 +844,24 @@ function generateOutput() {
     let code = "";
     acls.forEach(acl => {
         code += `<span class="comment-text">! ==========================================</span>\n`;
-        code += `<span class="keyword-text">ip access-list extended ${acl.name}</span>\n`;
+        // acl.name est sanitisé par updateAclName() mais on échappe en défense
+        code += `<span class="keyword-text">ip access-list extended ${escapeHtml(acl.name)}</span>\n`;
 
         acl.rules.forEach(r => {
-            if(r.comment) code += ` <span class="comment-text">remark ${r.comment}</span>\n`;
+            if(r.comment) code += ` <span class="comment-text">remark ${escapeHtml(r.comment)}</span>\n`;
             
             const srcNet = networks.find(n => n.id === r.srcId);
             const dstNet = networks.find(n => n.id === r.dstId);
             
             let portStr = "";
-            if (r.proto === 'icmp' && r.portStart) portStr = ` ${r.portStart}`;
+            if (r.proto === 'icmp' && r.portStart) portStr = ` ${escapeHtml(r.portStart)}`;
             else if (['tcp', 'udp'].includes(r.proto) && r.portStart) {
-                if (r.operator === 'range' && r.portEnd) portStr = ` range ${r.portStart} ${r.portEnd}`;
-                else portStr = ` ${r.operator} ${r.portStart}`;
+                if (r.operator === 'range' && r.portEnd) portStr = ` range ${escapeHtml(r.portStart)} ${escapeHtml(r.portEnd)}`;
+                else portStr = ` ${escapeHtml(r.operator)} ${escapeHtml(r.portStart)}`;
             }
 
-            let line = `  ${r.seq} <span class="keyword-text">${r.action}</span> ${r.proto} ${formatIPRule(srcNet)} ${formatIPRule(dstNet)}${portStr}`;
+            // formatIPRule retourne des IPs validées → sûres
+            let line = `  ${r.seq} <span class="keyword-text">${escapeHtml(r.action)}</span> ${escapeHtml(r.proto)} ${formatIPRule(srcNet)} ${formatIPRule(dstNet)}${portStr}`;
             if(r.established) line += " established";
             if(r.fragments) line += " fragments";
             if(r.logInput) line += " log-input"; else if(r.log) line += " log";
@@ -768,9 +874,9 @@ function generateOutput() {
             acl.targets.forEach(t => {
                 const intObj = interfaces.find(i => i.id === t.id);
                 if(intObj) {
-                    code += `<span class="keyword-text">interface ${intObj.name}</span>\n`;
-                    if(intObj.description) code += ` description ${intObj.description}\n`;
-                    code += ` ip access-group ${acl.name} ${t.dir}\n<span class="comment-text">!</span>\n`;
+                    code += `<span class="keyword-text">interface ${escapeHtml(intObj.name)}</span>\n`;
+                    if(intObj.description) code += ` description ${escapeHtml(intObj.description)}\n`;
+                    code += ` ip access-group ${escapeHtml(acl.name)} ${t.dir}\n<span class="comment-text">!</span>\n`;
                 }
             });
         }
@@ -780,7 +886,7 @@ function generateOutput() {
 }
 
 // ==========================================
-// 8. CARTE TOPOLOGIQUE & MERMAID
+// 9. CARTE TOPOLOGIQUE & MERMAID
 // ==========================================
 function setMermaidTab(tab) {
     activeMermaidTab = tab;
@@ -823,7 +929,10 @@ async function renderMermaidDiagram() {
     let graph = `graph ${currentMermaidLayout}\n`;
     networks.forEach(n => {
         let idNode = n.id === "any" ? "any_node" : "net_" + n.id;
-        let label = n.id === "any" ? "Internet (Any)" : `${n.name}<br/>${n.ip}`;
+        // escapeMermaidLabel évite que les guillemets dans les noms cassent la syntaxe du graphe
+        let label = n.id === "any"
+            ? "Internet (Any)"
+            : `${escapeMermaidLabel(n.name)}<br/>${escapeMermaidLabel(n.ip)}`;
         graph += `    ${idNode}["${label}"]\n`;
     });
 
@@ -834,12 +943,12 @@ async function renderMermaidDiagram() {
         let icon = r.action === 'permit' ? '✅' : '❌';
         
         let portInfo = "";
-        if (r.proto === 'icmp' && r.portStart) portInfo = ` ${r.portStart}`;
-        else if (['tcp', 'udp'].includes(r.proto) && r.portStart) portInfo = ` ${r.portStart}`;
+        if (r.proto === 'icmp' && r.portStart) portInfo = ` ${escapeMermaidLabel(r.portStart)}`;
+        else if (['tcp', 'udp'].includes(r.proto) && r.portStart) portInfo = ` ${escapeMermaidLabel(r.portStart)}`;
 
         let flagInfo = r.established ? " (Est)" : "";
         
-        let aclPrefix = r.aclName ? `[${r.aclName}]<br/>` : '';
+        let aclPrefix = r.aclName ? `[${escapeMermaidLabel(r.aclName)}]<br/>` : '';
         let labelText = `${aclPrefix}${icon} ${r.proto.toUpperCase()}${portInfo}${flagInfo}`;
 
         graph += `    ${srcNode} -- "${labelText}" --> ${dstNode}\n`;
@@ -897,7 +1006,7 @@ function toggleFullscreen() {
 }
 
 // ==========================================
-// 9. EXPORT / IMPORT DE FICHIERS
+// 10. EXPORT / IMPORT DE FICHIERS
 // ==========================================
 function exportConfigTxt() {
     const text = document.getElementById('output-code').innerText;
@@ -914,19 +1023,34 @@ function exportJson() {
 function importJson(event) {
     const file = event.target.files[0]; if(!file) return;
     const reader = new FileReader();
+
     reader.onload = (e) => {
-        const data = JSON.parse(e.target.result);
-        networks = data.networks;
-        interfaces = data.interfaces || []; 
+        try {
+            const data = JSON.parse(e.target.result);
+            if (!Array.isArray(data.networks) || !Array.isArray(data.acls)) {
+                return alert("Fichier JSON invalide ou corrompu.");
+            }
 
-        if(data.rules && !data.acls) {
-            acls = [{ id: "migrated_acl", name: data.aclName || "ACL_MIGREE", targets: data.selectedTargets || [], rules: data.rules }];
-            activeAclId = acls[0].id;
-        } else {
-            acls = data.acls; activeAclId = data.activeAclId || (acls.length > 0 ? acls[0].id : null);
+            networks = data.networks;
+            interfaces = Array.isArray(data.interfaces) ? data.interfaces : [];
+
+            if (data.rules && !data.acls.length) {
+                acls = [{ id: "migrated_acl", name: data.aclName || "ACL_MIGREE", targets: data.selectedTargets || [], rules: data.rules }];
+                activeAclId = acls[0].id;
+            } else {
+                acls = data.acls;
+                activeAclId = data.activeAclId || (acls.length > 0 ? acls[0].id : null);
+            }
+
+            migrateDataIfNeeded();
+            updateUI();
+            updatePortState();
+            saveToBrowser();
+
+        } catch (err) {
+            alert("Erreur de lecture du fichier JSON : contenu invalide ou corrompu.");
         }
-
-        migrateDataIfNeeded(); updateUI(); updatePortState(); saveToBrowser();
     };
+    
     reader.readAsText(file);
 }
