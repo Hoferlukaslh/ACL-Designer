@@ -134,6 +134,9 @@ th { background-color: #f9f9f9; }
     cursor: pointer;
     flex: 1;
     margin-bottom: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .dir-select { width: 70px; padding: 4px; font-size: 0.8rem; }
@@ -261,4 +264,63 @@ pre {
     display: flex;
     justify-content: flex-end;
     gap: 10px;
+}
+
+.advanced-flags {
+    background-color: #f8f9fa;
+    border: 1px dashed #ced4da;
+    padding: 10px;
+    border-radius: 4px;
+    margin-top: 5px;
+}
+
+.checkbox-row {
+    display: flex;
+    gap: 15px;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.checkbox-row label {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-weight: normal;
+    font-size: 0.8rem;
+    cursor: pointer;
+    margin-bottom: 0;
+}
+
+.badge {
+    display: inline-block;
+    padding: 2px 5px;
+    font-size: 0.65rem;
+    font-weight: bold;
+    border-radius: 3px;
+    color: white;
+    margin-right: 4px;
+}
+.badge-est { background-color: #3498db; }
+.badge-frag { background-color: #e67e22; }
+.badge-log { background-color: #9b59b6; }
+
+/* Alertes Sémantiques (Rule Shadowing & Implicit Deny) */
+.warning-alert {
+    background-color: #fdf3d8;
+    color: #8a6d3b;
+    border: 1px solid #faebcc;
+    padding: 10px 15px;
+    border-radius: 4px;
+    margin-bottom: 10px;
+    font-size: 0.85rem;
+}
+
+.danger-alert {
+    background-color: #f2dede;
+    color: #a94442;
+    border: 1px solid #ebccd1;
+    padding: 10px 15px;
+    border-radius: 4px;
+    margin-bottom: 10px;
+    font-size: 0.85rem;
 }
