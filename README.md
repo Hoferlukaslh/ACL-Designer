@@ -1,4 +1,14 @@
 # ACL Designer
+## Table des matières
+
+- [Fonctionnalités Principales](#fonctionnalités-principales)
+- [Fonctionnalités Avancées de Sécurité](#fonctionnalités-avancées-de-sécurité)
+- [Utilisation (Zéro Installation)](#utilisation-zéro-installation)
+- [Outils & Technologies Utilisées](#outils--technologies-utilisées)
+- [Comment utiliser la Rétro-conception (Import IOS) ?](#comment-utiliser-la-rétro-conception-import-ios-)
+- [Note sur l'IA](#note-sur-lia)
+
+--- 
 
 **ACL Designer** est un outil web interactif tout-en-un (zéro installation) conçu pour simplifier la création, la gestion et la visualisation de Listes de Contrôle d'Accès (ACL) étendues pour les équipements Cisco IOS. 
 
@@ -9,6 +19,8 @@ Fini les erreurs de syntaxe et les plans réseau brouillons : dessinez vos règl
 ![Aperçu du site](./Images/Site.png)
 
 ---
+
+
 
 ## Fonctionnalités Principales
 
@@ -23,17 +35,27 @@ Fini les erreurs de syntaxe et les plans réseau brouillons : dessinez vos règl
 * **Rétro-conception IOS (Reverse Engineering) :** Collez un extrait de `show running-config` (ACLs et interfaces). L'outil l'analyse, recrée les réseaux manquants et dessine la carte topologique automatiquement !
 * **Sauvegarde locale & JSON :** Vos données sont sauvegardées dans votre navigateur, avec possibilité d'exporter/importer des fichiers `.json`.
 
+## Fonctionnalités Avancées de Sécurité
+Cette version intègre des mécanismes d'audit inspirés des exigences réelles de production Cisco IOS :
+
+- Détection du Rule Shadowing : L'outil vous alerte si une règle de séquence supérieure est rendue inutile par une règle plus large placée au-dessus.
+- Alerte Implicit Deny : Notification visuelle immédiate si une ACL ne contient que des règles `deny`, risquant de provoquer une coupure totale de service.
+- Validation Binaire des Masques : Calculateur intégré vérifiant la cohérence mathématique entre vos adresses IP et vos masques Wildcards.
+- Support complet L4 & ICMP : Gestion native des types de messages ICMP (RFC 792) et des drapeaux TCP (`established`), ainsi que du `logging` pour l'auditabilité.
+
 ---
 
 ## Utilisation (Zéro Installation)
 
-L'application est un simple fichier HTML statique. Aucun backend ni serveur lourd n'est requis.
+L'application est un outil statique autonome. Aucun backend, base de données ou serveur lourd n'est requis pour son fonctionnement.
+1. Téléchargez l'archive contenant index.html, script.js et style.css.
 
-1. Téléchargez le fichier `ACL_Designer.html`.
-2. Ouvrez-le dans votre navigateur web préféré (Chrome, Firefox, Edge, etc.).
+2. Ouvrez index.html dans votre navigateur web (Chrome, Firefox, Edge, etc.).
 
-> **Note concernant la sécurité des navigateurs :** > Si vous ouvrez le fichier directement par un double-clic (`file:///...`), le navigateur pourrait bloquer la génération d'images Mermaid pour des raisons de sécurité strictes sur les fichiers locaux. 
-> **Recommandation :** Utilisez une petite extension comme **Live Server** sur VS Code pour exécuter le fichier via un serveur local (`http://127.0.0.1:5500`), ce qui débloquera 100% des fonctionnalités d'exportation.
+Note concernant la sécurité des navigateurs :
+Si vous exécutez l'application localement via le protocole `file:///`, certaines fonctionnalités de rendu Mermaid ou d'exportation PNG pourraient être restreintes par les politiques de sécurité strictes du navigateur.
+
+Recommandation : Utilisez une extension comme Live Server sur VS Code pour exécuter le fichier via un serveur local (`http://127.0.0.1:5500`). Cela garantit le déblocage de 100% des fonctionnalités d'exportation et de rendu dynamique.
 
 ---
 
