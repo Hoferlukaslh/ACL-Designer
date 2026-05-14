@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ACL Designer - Édition IOS Avancée</title>
+    
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/svg-pan-zoom@3.6.1/dist/svg-pan-zoom.min.js"></script>
+
+    <link rel="stylesheet" href="style.css">
+    <script src="script.js" defer></script>
+</head>
+<body>
+    <header>
+        <div class="header-info">
+            <h1>ACL Designer</h1>
+            <p>Gestionnaire de réseaux et de listes de contrôle d'accès multiples avec topologie en temps réel</p>
+        </div>
+        <div class="header-actions">
+            <button class="danger" onclick="clearProject()" style="background-color: #c0392b;">🗑️ Tout effacer</button>
+            <button class="danger" onclick="openIosImport()">⚠️ Importer IOS</button>
+            <button class="dark" onclick="exportJson()">💾 Sauvegarder (.json)</button>
+            <button class="dark" onclick="document.getElementById('import-file').click()">📂 Charger JSON</button>
+            <input type="file" id="import-file" accept=".json" onchange="importJson(event)">
+            <button class="accent" onclick="exportConfigTxt()">📄 Exporter Config IOS</button>
+        </div>
+    </header>
+
+    <div class="container">
+        <div class="panel" style="flex: 1.4;">
+            <h2 id="vlan-form-title">1. Registre des Réseaux (Sources & Destinations)</h2>
+            <div id="vlan-form-container">
+                <div class="row" style="align-items: flex-start;">
+                    <div class="form-group" style="flex: 0.4;">
+                        <label>ID / Ref</label>
+                        <input type="text" id="vlan-id" placeholder="Ex: 10">
+                    </div>
+                    <div class="form-group">
+                        <label>Nom du réseau</label>
+                        <input type="text" id="vlan-name" placeholder="Serveurs">
+                    </div>
+                    <div class="form-group">
+                        <label>Adresse IP</label>
+                        <input type="text" id="vlan-ip" placeholder="192.168.10.0">
+                    </div>
+                    <div class="form-group">
+                        <label>Wildcard Mask</label>
+                        <input type="text" id="vlan-wild" value="0.0.0.255">
+                    </div>
+                </div>
+                <div class="row">
+                    <button id="btn-add-vlan" onclick="saveVlan()">+ Enregistrer Réseau</button>
+                    <button id="btn-cancel-vlan" class="cancel" onclick="cancelVlanEdit()" style="display:none;">Annuler</button>
+                </div>
+            </div>
+            <div class="scroll-area" id="vlan-list-container"></div>
+
+            <h2 id="interface-form-title">2. Registre des Interfaces (Points d'application)</h2>
+            <div id="interface-form-container">
+                <div class="row" style="align-items: flex-start;">
+                    <div class="form-group" style="flex: 1;">
+                        <label>Nom de l'Interface (IOS)</label>
+                        <input type="text" id="int-name" placeholder="Ex: GigabitEthernet0/0">
+                    </div>
+                    <div class="form-group" style="flex: 1;">
+                        <label>Description / Rôle</label>
+                        <input type="text" id="int-desc" placeholder="Ex: WAN Internet">
+                    </div>
+                </div>
+                <div class="row">
+                    <button id="btn-add-int" onclick="saveInterface()">+ Enregistrer Interface</button>
+                    <button id="btn-cancel-int" class="cancel" onclick="cancelInterfaceEdit()" style="display:none;">Annuler</button>
+                </div>
+            </div>
+            <div class="scroll-area" id="interface-list-container"></div>
+
+            <h2>3. Gestionnaire d'ACL Étendues</h2>
+            <div class="acl-manager-box">
+                <div class="row">
+                    <div class="form-group" style="flex: 2;">
+                        <label>Sélectionner l'ACL à modifier</label>
+                        <select id="acl-selector" onchange="changeActiveAcl()"></select>
+                    </div>
+                    <div class="form-group" style="flex: 1; display:flex; gap:10px;">
+                        <button class="outline" onclick="createNewAcl()" style="width:100%;">+ Nouvelle ACL</button>
+                    </div>
+                </div>
+
+                <div id="active-acl-settings" style="display:none;">
+                    <div class="row">
+                        <div class="form-group" style="flex:2;">
+                            <label>Nom de l'ACL (IOS)</label>
+                            <input type="text" id="acl-custom-name" oninput="updateAclName()">
+                        </div>
+                        <div class="form-group" style="display:flex; justify-content:flex-end;">
+                            <button class="danger" onclick="deleteActiveAcl()">Supprimer cette ACL</button>
+                        </div>
+                    </div>
+                    <label>Interfaces cibles (Application et direction)</label>
+                    <div class="target-vlan-selector" id="target-interface-list"></div>
+                </div>
+            </div>
+
+            <h2 id="rule-form-title">4. Éditeur d'Access Control Entry (ACE)</h2>
+            <div id="rule-form-container">
+                <div class="row" style="align-items: flex-start;">
+                    <div class="form-group" style="flex: 0.2;">
+                        <label>Séquence</label>
+                        <input type="number" id="rule-seq" placeholder="Auto">
+                    </div>
+                    <div class="form-group" style="flex: 0.8;">
+                        <label>Commentaire (Remark)</label>
+                        <input type="text" id="rule-comment" placeholder="Description de la règle">
+                    </div>
+                </div>
+                
+                <div class="row" style="align-items: flex-start;">
+                    <div class="form-group">
+                        <label>Action</label>
+                        <select id="rule-action">
+                            <option value="permit">Permit</option>
+                            <option value="deny">Deny</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Protocole</label>
+                        <select id="rule-proto" onchange="updatePortState()">
+                            <option value="ip">IP</option>
+                            <option value="tcp">TCP</option>
+                            <option value="udp">UDP</option>
+                            <option value="icmp">ICMP</option>
+                            <option value="ospf">OSPF</option>
+                            <option value="eigrp">EIGRP</option>
+                            <option value="esp">ESP</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="row" style="align-items: flex-start;">
+                    <div class="form-group">
+                        <label>Source</label>
+                        <select id="rule-src"></select>
+                    </div>
+                    <div class="form-group">
+                        <label>Destination</label>
+                        <select id="rule-dst"></select>
+                    </div>
+                </div>
+
+                <div class="row" style="align-items: flex-start;" id="port-options-row">
+                    <div class="form-group" id="group-operator" style="flex: 0.3;">
+                        <label>Opérateur</label>
+                        <select id="rule-operator" onchange="updatePortState()">
+                            <option value="eq">eq (=)</option>
+                            <option value="gt">gt (>)</option>
+                            <option value="lt">lt (<)</option>
+                            <option value="neq">neq (≠)</option>
+                            <option value="range">range</option>
+                        </select>
+                    </div>
+                    <div class="form-group" id="group-port">
+                        <label id="label-port">Port (L4) / Type</label>
+                        <div class="port-group">
+                            <input type="text" id="rule-port-start" placeholder="Ex: 80">
+                            <span id="range-separator" style="display:none;">-</span>
+                            <input type="text" id="rule-port-end" placeholder="Fin">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-group advanced-flags">
+                    <label>Attributs de sécurité et d'audit</label>
+                    <div class="checkbox-row">
+                        <label><input type="checkbox" id="rule-established"> Established (TCP Statut)</label>
+                        <label><input type="checkbox" id="rule-fragments"> Fragments</label>
+                        <label><input type="checkbox" id="rule-log"> Log</label>
+                        <label><input type="checkbox" id="rule-log-input"> Log-Input</label>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <button id="btn-add-rule" onclick="saveRule()">+ Ajouter la règle</button>
+                    <button id="btn-cancel-rule" class="cancel" onclick="cancelRuleEdit()" style="display:none;">Annuler</button>
+                </div>
+            </div>
+
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <h2>Tableau des Règles de l'ACL</h2>
+            </div>
+            <div id="acl-warnings"></div> 
+            <table>
+                <thead>
+                    <tr>
+                        <th title="Sequence Number">Seq</th>
+                        <th>Action</th>
+                        <th>Proto</th>
+                        <th>Source</th>
+                        <th>Destination</th>
+                        <th>Options (L4/Flags)</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="rules-table-body"></tbody>
+            </table>
+        </div>
+
+        <div class="panel">
+            <h2>5. Topologie Dynamique (Mermaid.js)</h2>
+            <div class="toolbar">
+                <div style="display: flex; gap: 10px;">
+                    <button id="tab-mermaid-current" class="dark" onclick="setMermaidTab('current')">ACL Active</button>
+                    <button id="tab-mermaid-all" class="outline" onclick="setMermaidTab('all')">Toutes les ACL</button>
+                </div>
+                <button id="btn-mermaid-layout" class="outline" onclick="toggleMermaidLayout()">🔄 Layout</button>
+            </div>
+            <div id="mermaid-output-wrapper">
+                <div class="diagram-controls">
+                    <button class="accent" onclick="downloadMermaidPng()">⬇️ PNG</button>
+                    <button id="btn-fullscreen" class="dark" onclick="toggleFullscreen()">Plein Écran</button>
+                </div>
+                <div id="mermaid-output"></div>
+            </div>
+
+            <h2>6. Code de Production Cisco IOS</h2>
+            <pre id="output-code"></pre>
+        </div>
+    </div>
+
+    <div id="ios-import-modal" class="modal-overlay">
+        <div class="modal-content">
+            <h2 style="margin-top:0; border-bottom:none; color:var(--danger);">⚠️ Rétro-conception de configuration IOS</h2>
+            <p style="font-size: 0.9rem; margin-bottom: 15px;">Collez le résultat d'un <code>show running-config</code>. Le parseur gère désormais la numérotation séquentielle et les attributs avancés (log, established, etc.).</p>
+            <textarea id="ios-text" placeholder="ip access-list extended EDGE-SECURITY&#10; 10 permit tcp any any eq 443 established&#10; 20 deny udp any any eq 53 log-input&#10; 30 permit icmp any any echo-reply&#10;!&#10;interface GigabitEthernet0/0&#10; ip access-group EDGE-SECURITY in&#10;!"></textarea>
+            <div class="modal-actions">
+                <button class="cancel" onclick="closeIosImport()">Annuler</button>
+                <button class="danger" onclick="processIosImport()">Importer et Écraser le Projet</button>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
